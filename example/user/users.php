@@ -98,7 +98,7 @@ $pagination = [
     'SiralamaYonu'    => 'DESC',
 ];
 
-$response = $userService->getUsers();
+$response = $userService->getUsers($filters, $pagination);
 if ($response->isSuccess()) {
     foreach ($response->data as $user) {
         echo (

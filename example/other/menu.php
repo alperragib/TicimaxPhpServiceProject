@@ -8,7 +8,7 @@ use AlperRagib\Ticimax\Ticimax;
 $ticimax = new Ticimax(TICIMAX_MAIN_DOMAIN, TICIMAX_API_KEY);
 $menuService = $ticimax->menuService();
 
-echo "\n--- List Brands ---\n";
+echo "\n--- List Menu ---\n";
 
 $parameters = [
     'Aktif'       => null,
