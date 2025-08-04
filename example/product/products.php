@@ -12,7 +12,7 @@ $productService = $ticimax->productService();
 echo "\n--- List Products ---\n";
 
 $filters = [
-    'Aktif'                    => 1,   // -1: no filter, 0: false, 1: true
+    'Aktif'                    => 1,    // -1: no filter, 0: false, 1: true
     'Firsat'                   => -1,   // -1: no filter, 0: false, 1: true
     'Indirimli'                => -1,   // -1: no filter, 0: false, 1: true
     'Vitrin'                   => -1,   // -1: no filter, 0: false, 1: true

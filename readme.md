@@ -30,22 +30,40 @@ $productService = $ticimax->productService();
 
 // Fetch products with filters
 $filters = [
-    'Aktif' => 1,
-    'KategoriID' => 0
+    'Aktif'                    => 1,    // -1: no filter, 0: false, 1: true
+    'Firsat'                   => -1,   // -1: no filter, 0: false, 1: true
+    'Indirimli'                => -1,   // -1: no filter, 0: false, 1: true
+    'Vitrin'                   => -1,   // -1: no filter, 0: false, 1: true
+    'KategoriID'               => 0,    // 0: no filter
+    'MarkaID'                  => 0,    // 0: no filter
+    'UrunKartiID'              => 0,    // 0: no filter
+    'ToplamStokAdediBas'       => null, // Starting stock amount (double)
+    'ToplamStokAdediSon'       => null, // Ending stock amount (double)
+    'TedarikciID'              => 0,    // 0: no filter
+    'Dil'                      => 'tr',
 ];
 
 $pagination = [
-    'KayitSayisi' => 20,
-    'SayfaNo' => 1
+    'BaslangicIndex'            => 0,
+    'KayitSayisi'               => 10,
+    'KayitSayisinaGoreGetir'    => true,
+    'SiralamaDegeri'            => 'Sira',
+    'SiralamaYonu'              => 'ASC',
 ];
 
 $response = $productService->getProducts($filters, $pagination);
 
 if ($response->isSuccess()) {
-    foreach ($response->getData() as $product) {
-        echo $product->UrunAdi . "\n";
+    foreach ($response->data as $product) {
+        echo (
+            ($product->UrunAdi ?? '[No UrunAdi]') .
+            ' (ID: ' . ($product->ID ?? '[No ID]') .
+            ', ToplamStokAdedi: ' . ($product->ToplamStokAdedi ?? '[No ToplamStokAdedi]') .
+            ")\n"
+        );
     }
 }
+
 ```
 
 ## Available Services
@@ -70,32 +88,6 @@ if ($response->isSuccess()) {
 // User authentication
 $userService = $ticimax->userService();
 $loginResponse = $userService->login('user@example.com', 'password');
-
-// Get user addresses
-$addresses = $userService->getUserAddresses(1050);
-```
-
-### Order Management
-
-```php
-// Fetch orders
-$orderService = $ticimax->orderService();
-$orders = $orderService->getOrders([
-    'SiparisTarihiBas' => '2024-01-01',
-    'SiparisTarihiSon' => '2025-01-01'
-]);
-```
-
-### Product Management
-
-```php
-// Get product variations
-$productService = $ticimax->productService();
-$variations = $productService->getProductVariations([
-    'Aktif' => 1,
-    'UrunKartiID' => 123
-]);
-```
 
 ## Error Handling
 
