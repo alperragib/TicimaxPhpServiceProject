@@ -84,10 +84,21 @@ class ApiResponse
      */
     public function toArray(): array
     {
+        $data = $this->data;
+
+        if (is_array($data)) {
+            $data = array_map(function ($item) {
+                if ($item instanceof \JsonSerializable) {
+                    return $item->jsonSerialize();
+                }
+                return $item;
+            }, $data);
+        }
+
         return [
             'success' => $this->success,
             'message' => $this->message,
-            'data' => $this->data
+            'data' => $data,
         ];
     }
 
@@ -95,4 +106,4 @@ class ApiResponse
     {
         return json_encode($this->toArray());
     }
-} 
+}

@@ -7,10 +7,10 @@ namespace AlperRagib\Ticimax\Model;
 /**
  * Base model class for all models in the system
  */
-class BaseModel
+class BaseModel implements \JsonSerializable
 {
     /** @var array */
-    protected array $data = [];
+    public array $data = [];
 
     /** @var array Model mapping configuration */
     protected array $modelMapping = [];
@@ -145,6 +145,11 @@ class BaseModel
         return $data;
     }
 
+    public function jsonSerialize(): mixed
+    {
+        return $this->toArray();
+    }
+
     /**
      * Convert nested model instances back to arrays
      * @param mixed $data
@@ -194,7 +199,7 @@ class BaseModel
     public function getNestedModels(string $field): array
     {
         $data = $this->data[$field] ?? [];
-        
+
         if (is_array($data)) {
             return array_filter($data, function ($item) {
                 return $item instanceof BaseModel;
@@ -213,4 +218,4 @@ class BaseModel
     {
         return count($this->getNestedModels($field));
     }
-} 
+}

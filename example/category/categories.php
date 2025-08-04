@@ -10,6 +10,8 @@ $categoryService = $ticimax->categoryService();
 
 echo "\n--- List Categories ---\n";
 $response = $categoryService->getCategories(0, null, 'tr');
+
+
 if ($response->isSuccess()) {
     foreach ($response->data as $category) {
         echo (
