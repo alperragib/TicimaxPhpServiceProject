@@ -14,7 +14,7 @@ A modern PHP SDK for interacting with Ticimax E-commerce Web Services. Built wit
 ## Installation
 
 ```bash
-composer require alperragib/ticimax-php
+composer require alperragib/ticimax-php-service
 ```
 
 ## Quick Start
