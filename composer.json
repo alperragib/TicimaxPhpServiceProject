@@ -1,0 +1,31 @@
+{
+  "name": "alperragib/ticimax-php",
+  "description": "A PHP library for integrating with the Ticimax SOAP API.",
+  "type": "library",
+  "license": "MIT",
+  "minimum-stability": "stable",
+  "authors": [
+    {
+      "name": "Alper Ragıb",
+      "email": "alper.ragib@gmail.com"
+    }
+  ],
+  "require": {
+    "ext-soap": "*",
+    "ext-mbstring": "*",
+    "phpunit/phpunit": "^10.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "AlperRagib\\Ticimax\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "AlperRagib\\Ticimax\\Tests\\": "tests/"
+    }
+  }
+}
