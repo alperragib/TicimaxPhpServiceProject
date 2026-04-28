@@ -4,6 +4,9 @@ require_once __DIR__ . '/../config.php';
 
 use AlperRagib\Ticimax\Ticimax;
 use AlperRagib\Ticimax\Model\BaseModel;
+use AlperRagib\Ticimax\Service\Order\OrderStatus;
+use AlperRagib\Ticimax\Service\Order\PaymentStatus;
+use AlperRagib\Ticimax\Service\Order\PaymentType;
 
 
 $ticimax = new Ticimax(TICIMAX_MAIN_DOMAIN, TICIMAX_API_KEY);
@@ -117,11 +120,11 @@ $order = [
         'BankaKomisyonu' => 0.0,
         'HavaleHesapID' => null,
         'KapidaOdemeTutari' => 0.0,
-        'OdemeDurumu' => 1,
+        'OdemeDurumu' => PaymentStatus::ONAY_BEKLIYOR,
         'OdemeIndirimi' => 0.0,
         'OdemeNotu' => 'Test siparişi',
         'OdemeSecenekID' => 1,
-        'OdemeTipi' => 1,
+        'OdemeTipi' => PaymentType::HAVALE,
         'TaksitSayisi' => 1,
         'Tarih' => date('c'),
         'Tutar' => 100.00
@@ -164,3 +167,41 @@ $order = [
 $response = $orderService->createOrder($order);
 print($response->getMessage());
 print_r($response->data);
+
+
+echo "\n--- Mark Order as Awaiting Payment ---\n";
+// Right after creating the order, mark it as "Ödeme bekliyor" so the customer
+// (and your back office) sees that we are still waiting on payment confirmation.
+if ($response->isSuccess() && isset($response->data->ID)) {
+    $newOrderId = (int) $response->data->ID;
+
+    $awaitingPayment = $orderService->setOrderStatus(
+        $newOrderId,
+        OrderStatus::ODEME_BEKLIYOR,
+        '',     // kargo takip no — yok
+        false   // mail bilgilendirmesi — istemiyoruz
+    );
+    echo $awaitingPayment->getMessage() . "\n";
+
+
+    echo "\n--- Mark Order as Paid (Onaylandi) ---\n";
+    // Once your payment provider confirms the payment, flip the order to
+    // "Onaylandı" (or directly to "Paketleniyor" if you prefer to skip the
+    // approval step). Ticimax has no separate "payment received" status on
+    // the order itself — the order status carries that meaning.
+    $paid = $orderService->setOrderStatus(
+        $newOrderId,
+        OrderStatus::ONAYLANDI,
+        '',
+        true    // müşteriye onay maili gitsin
+    );
+    echo $paid->getMessage() . "\n";
+}
+
+
+echo "\n--- Cargo / Delivery Shortcuts ---\n";
+// Convenience helpers for the rest of the flow:
+//   $orderService->saveCargoTrackingNumber($orderId, '4561562545', '', 'https://...');
+//   $orderService->setOrderShipped($orderId);     // = OrderStatus::KARGOYA_VERILDI
+//   $orderService->setOrderDelivered($orderId);   // = OrderStatus::TESLIM_EDILDI
+//   $orderService->setInvoiceNumber($orderId, 'FTR-2025-0001');
