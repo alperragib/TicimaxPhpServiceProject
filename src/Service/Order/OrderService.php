@@ -164,6 +164,161 @@ class OrderService
     }
 
     /**
+     * Update a payment record's status (SetSiparisOdemeDurum).
+     *
+     * Distinct from setOrderStatus(): that mutates the order's lifecycle state,
+     * while this mutates the WebSiparisOdeme row's own status. PayTR / iyzico
+     * notify webhooks should typically call BOTH — flipping just the order
+     * status leaves the payment row showing as unpaid in the Ticimax admin
+     * panel.
+     *
+     * Pass a PaymentStatus integer constant (e.g. PaymentStatus::ONAYLANDI) — it
+     * is translated to the PascalCase string the WSDL's WebOdemeDurumlari enum
+     * expects. A PascalCase string (e.g. "Onaylandi") is also accepted and
+     * passed through.
+     *
+     * @param int        $siparisId    Ticimax SiparisID.
+     * @param int        $odemeId      WebSiparisOdeme.ID — fetch via getOrderPaymentId().
+     * @param int|string $status       Payment status (PaymentStatus::* or PascalCase string).
+     * @param bool       $notifyByMail Whether Ticimax should email the customer.
+     * @return ApiResponse
+     */
+    public function setOrderPaymentStatus(
+        int $siparisId,
+        int $odemeId,
+        $status,
+        bool $notifyByMail = false
+    ): ApiResponse {
+        $client = $this->request->soap_client($this->apiUrl);
+        try {
+            $response = $client->__soapCall('SetSiparisOdemeDurum', [[
+                'UyeKodu' => $this->request->key,
+                'request' => (object)[
+                    'BilgiMailiGonderme' => $notifyByMail,
+                    'OdemeDurum'         => PaymentStatus::nameFor($status),
+                    'OdemeId'            => $odemeId,
+                    'SiparisId'          => $siparisId,
+                ],
+            ]]);
+
+            $result = $response->SetSiparisOdemeDurumResult ?? null;
+
+            $isError = $result->IsErros ?? $result->IsError ?? false;
+            if ($isError) {
+                $message = !empty($result->ErrorMessage)
+                    ? trim($result->ErrorMessage, '. ') . '.'
+                    : 'Error updating payment status.';
+                return ApiResponse::error($message);
+            }
+
+            return ApiResponse::success(null, 'Payment status updated successfully.');
+        } catch (SoapFault $e) {
+            return ApiResponse::error('Error updating payment status: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Look up the WebSiparisOdeme.ID for an order's primary payment record.
+     *
+     * Calls SelectSiparis with OdemeGetir=true and parses the raw SOAP response
+     * directly (NOT via getOrders()'s BaseModel wrapping, which flattens nested
+     * arrays and would lose the Odemeler→WebSiparisOdeme path).
+     *
+     * Note: the SOAP response uses the path Odemeler.WebSiparisOdeme — NOT
+     * "Odeme", which is the createOrder *request* key, not the response shape.
+     * When an order has a single payment row it arrives as an object; multiple
+     * rows arrive as an array. We always return the first row's ID.
+     *
+     * @param int $siparisId Ticimax SiparisID.
+     * @return int|null Payment row ID, or null if order/payment not found.
+     */
+    public function getOrderPaymentId(int $siparisId): ?int
+    {
+        $client = $this->request->soap_client($this->apiUrl);
+        try {
+            // Ticimax's SelectSiparis silently returns an empty result if any
+            // of its many filter fields are missing, so we have to populate
+            // the full surface with neutral sentinels even though we only
+            // care about SiparisID + OdemeGetir.
+            $response = $client->__soapCall('SelectSiparis', [[
+                'UyeKodu' => $this->request->key,
+                'f' => (object)[
+                    'DurumTarihiBas'              => null,
+                    'DurumTarihiSon'              => null,
+                    'DuzenlemeTarihiBas'          => null,
+                    'DuzenlemeTarihiSon'          => null,
+                    'EFaturaURL'                  => null,
+                    'EntegrasyonAktarildi'        => -1,
+                    'EntegrasyonParams'           => (object)[
+                        'AlanDeger'              => '',
+                        'Deger'                  => '',
+                        'EntegrasyonKodu'        => '',
+                        'EntegrasyonParamsAktif' => false,
+                        'TabloAlan'              => '',
+                        'Tanim'                  => '',
+                    ],
+                    'FaturaNo'                    => '',
+                    'IptalEdilmisUrunler'         => true,
+                    'KampanyaGetir'               => false,
+                    'KargoEntegrasyonTakipDurumu' => null,
+                    'KargoFirmaID'                => -1,
+                    'OdemeDurumu'                 => -1,
+                    'OdemeGetir'                  => true,
+                    'OdemeTamamlandi'             => null,
+                    'OdemeTipi'                   => -1,
+                    'PaketlemeDurumu'             => null,
+                    'PazaryeriIhracat'            => null,
+                    'SiparisDurumu'               => -1,
+                    'SiparisID'                   => $siparisId,
+                    'SiparisKaynagi'              => '',
+                    'SiparisKodu'                 => '',
+                    'SiparisNo'                   => '',
+                    'SiparisTarihiBas'            => null,
+                    'SiparisTarihiSon'            => null,
+                    'StrPaketlemeDurumu'          => '',
+                    'StrSiparisDurumu'            => '',
+                    'StrSiparisID'                => '',
+                    'TedarikciID'                 => -1,
+                    'TeslimatGunuBas'             => null,
+                    'TeslimatGunuSon'             => null,
+                    'TeslimatMagazaID'            => null,
+                    'UrunGetir'                   => null,
+                    'UyeID'                       => 0,
+                    'UyeTelefon'                  => '',
+                ],
+                's' => (object)[
+                    'BaslangicIndex' => 0,
+                    'KayitSayisi'    => 1,
+                    'SiralamaDegeri' => 'ID',
+                    'SiralamaYonu'   => 'DESC',
+                ],
+            ]]);
+
+            $orders = $response->SelectSiparisResult->WebSiparis ?? null;
+            if ($orders === null) {
+                return null;
+            }
+            $order = is_array($orders) ? ($orders[0] ?? null) : $orders;
+            if ($order === null) {
+                return null;
+            }
+
+            $odemeler = $order->Odemeler->WebSiparisOdeme ?? null;
+            if ($odemeler === null) {
+                return null;
+            }
+            $first = is_array($odemeler) ? ($odemeler[0] ?? null) : $odemeler;
+            if ($first === null || !isset($first->ID)) {
+                return null;
+            }
+
+            return (int) $first->ID;
+        } catch (SoapFault $e) {
+            return null;
+        }
+    }
+
+    /**
      * Mark an order as shipped (SetSiparisKargoyaVerildi).
      *
      * Shortcut for moving the order into the "Kargoya verildi" state. Equivalent

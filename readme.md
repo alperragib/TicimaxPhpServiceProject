@@ -123,13 +123,19 @@ $orderId = (int) $created->data->ID;
 // 2) Move the order into "Ödeme bekliyor" so the customer/back office sees it
 $orderService->setOrderStatus($orderId, OrderStatus::ODEME_BEKLIYOR);
 
-// 3) When the payment provider confirms the payment, flip it to "Onaylandı"
+// 3) When the payment provider (PayTR / iyzico) confirms the payment via its
+//    notify webhook, flip BOTH the order status AND the payment record:
 $orderService->setOrderStatus(
     $orderId,
     OrderStatus::ONAYLANDI,
     '',     // optional cargo tracking number
     true    // notify the customer by email
 );
+
+$paymentId = $orderService->getOrderPaymentId($orderId);
+if ($paymentId !== null) {
+    $orderService->setOrderPaymentStatus($orderId, $paymentId, PaymentStatus::ONAYLANDI);
+}
 
 // Cargo / fulfillment shortcuts
 $orderService->saveCargoTrackingNumber($orderId, '4561562545', '', 'https://carrier.example/track/4561562545');
@@ -145,6 +151,8 @@ $orderService->setInvoiceNumber($orderId, 'FTR-2025-0001');
 | `getOrders($filters, $pagination)`                                        | `SelectSiparis`            | List orders.                                                   |
 | `createOrder($order)`                                                     | `SaveSiparis`              | Create a new order.                                            |
 | `setOrderStatus($id, $status, $kargoTakipNo = '', $notifyByMail = false)` | `SetSiparisDurum`          | Change the order's status. Use the `OrderStatus::*` constants. |
+| `setOrderPaymentStatus($id, $odemeId, $status, $notifyByMail = false)`    | `SetSiparisOdemeDurum`     | Change a payment record's status (e.g. on PayTR / iyzico notify). Use `PaymentStatus::*`. |
+| `getOrderPaymentId($id)`                                                  | `SelectSiparis`            | Helper: look up `WebSiparisOdeme.ID` for an order — needed for `setOrderPaymentStatus`. |
 | `setOrderShipped($id)`                                                    | `SetSiparisKargoyaVerildi` | Shortcut for the "Kargoya verildi" state.                      |
 | `setOrderDelivered($id)`                                                  | `SetSiparisTeslimEdildi`   | Shortcut for the "Teslim edildi" state.                        |
 | `setOrderTransferred($id)`                                                | `SetSiparisAktarildi`      | Mark the order as transferred to an external system.           |
@@ -185,8 +193,18 @@ PascalCase string directly if you prefer.
 | `KISMI_IADE_YAPILDI`  | 17    | Kısmi iade yapıldı           |
 | `TESLIM_EDILEMEDI`    | 18    | Teslim edilemedi             |
 
-**`PaymentStatus`** (used in `Odeme.OdemeDurumu` when creating an order):
-`ONAY_BEKLIYOR=0`, `ONAYLANDI=1`, `HATALI=2`, `IADE_EDILMIS=3`, `IPTAL_EDILMIS=4`.
+**`PaymentStatus`** integer constants. Used both in `Odeme.OdemeDurumu` when
+creating an order, and as the `$status` argument to `setOrderPaymentStatus()`
+(the service translates them to the PascalCase strings `WebOdemeDurumlari`
+expects, e.g. `ONAYLANDI` → `"Onaylandi"`):
+
+| Constant         | Value | Meaning       |
+| ---------------- | ----- | ------------- |
+| `ONAY_BEKLIYOR`  | 0     | Onay bekliyor |
+| `ONAYLANDI`      | 1     | Onaylandı     |
+| `HATALI`         | 2     | Hatalı        |
+| `IADE_EDILMIS`   | 3     | İade edilmiş  |
+| `IPTAL_EDILMIS`  | 4     | İptal edilmiş |
 
 **`PaymentType`** (used in `Odeme.OdemeTipi`): `KREDI_KARTI=0`, `HAVALE=1`,
 `KAPIDA_ODEME_NAKIT=2`, `KAPIDA_ODEME_KK=3`, `MOBIL_ODEME=4`, `BKM_EXPRESS=5`,
@@ -196,12 +214,15 @@ PascalCase string directly if you prefer.
 `PAYGURUMOBIL=21`, `PAYNET=22`, `TELR=23`, `COMPAY=24`, `PAYTR=25`,
 `MAXIMUM_MOBIL=26`, `MAGAZADA_ODE=27`.
 
-> **Note on payment vs. order status.** Ticimax models "ödeme yapıldı" through
-> the **order status** (`OrderStatus`), not through `PaymentStatus`. The typical
-> flow is: create the order → `setOrderStatus(..., OrderStatus::ODEME_BEKLIYOR)`
-> while waiting on payment → `setOrderStatus(..., OrderStatus::ONAYLANDI)` once
-> the payment provider confirms. `PaymentStatus` only describes the state of the
-> payment record itself (used at order creation time inside the `Odeme` block).
+> **Note on payment vs. order status.** Ticimax keeps two separate fields: the
+> **order status** (`OrderStatus`) drives the order's lifecycle (Ödeme bekliyor
+> → Onaylandı → Kargoya verildi → …), while **payment status**
+> (`PaymentStatus`) describes the WebSiparisOdeme row's own state. PayTR /
+> iyzico notify callbacks should typically flip BOTH:
+> `setOrderStatus(..., OrderStatus::ONAYLANDI)` so the order moves out of
+> "Ödeme bekliyor", **and** `setOrderPaymentStatus(..., PaymentStatus::ONAYLANDI)`
+> so the admin panel shows the payment row as captured. Setting only the order
+> status leaves the payment record looking unpaid.
 
 ## Error Handling
 
