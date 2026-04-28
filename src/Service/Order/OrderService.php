@@ -118,41 +118,37 @@ class OrderService
      * Update an order's status (SetSiparisDurum).
      *
      * Ticimax does not expose a generic "update order" method; the only
-     * mutation supported on an existing order is its status. Use the
-     * OrderStatus constants for the $status value (e.g. OrderStatus::ODEME_BEKLIYOR
-     * when registering the order, OrderStatus::ONAYLANDI when payment is captured).
+     * mutation supported on an existing order is its status. Pass an OrderStatus
+     * integer constant (e.g. OrderStatus::ODEME_BEKLIYOR) — it is translated
+     * to the PascalCase string the WSDL's WebSiparisDurumlari enum expects.
+     * A PascalCase string (e.g. "Onaylandi") is also accepted and passed through.
      *
-     * @param int    $orderId      Ticimax SiparisID.
-     * @param int    $status       Order status value (OrderStatus::*).
-     * @param string $kargoTakipNo Optional cargo tracking number.
-     * @param bool   $notifyByMail Whether Ticimax should email the customer.
+     * @param int          $orderId      Ticimax SiparisID.
+     * @param int|string   $status       Order status (OrderStatus::* or PascalCase string).
+     * @param string       $kargoTakipNo Optional cargo tracking number.
+     * @param bool         $notifyByMail Whether Ticimax should email the customer.
      * @return ApiResponse
      */
     public function setOrderStatus(
         int $orderId,
-        int $status,
+        $status,
         string $kargoTakipNo = '',
         bool $notifyByMail = false
     ): ApiResponse {
         $client = $this->request->soap_client($this->apiUrl);
         try {
-            $params = [
+            $response = $client->__soapCall('SetSiparisDurum', [[
                 'UyeKodu' => $this->request->key,
-                'SetSiparisDurumRequest' => (object)[
-                    'Durum'           => $status,
+                'request' => (object)[
+                    'Durum'           => OrderStatus::nameFor($status),
                     'KargoTakipNo'    => $kargoTakipNo,
                     'MailBilgilendir' => $notifyByMail,
                     'SiparisID'       => $orderId,
                 ],
-            ];
-
-            $response = $client->__soapCall('SetSiparisDurum', [
-                'parameters' => $params,
-            ]);
+            ]]);
 
             $result = $response->SetSiparisDurumResult ?? null;
 
-            // Ticimax returns IsErros (sic) — the API documents a typo.
             $isError = $result->IsErros ?? $result->IsError ?? false;
             if ($isError) {
                 $message = !empty($result->ErrorMessage)
@@ -218,19 +214,25 @@ class OrderService
     /**
      * Set the invoice number on an order (SetFaturaNo).
      *
-     * @param int    $orderId   Ticimax SiparisID.
-     * @param string $invoiceNo Invoice number to attach.
+     * @param int      $orderId      Ticimax SiparisID.
+     * @param string   $invoiceNo    Invoice number to attach.
+     * @param string   $invoiceDate  Optional invoice date as ISO 8601; empty leaves it unset.
      * @return ApiResponse
      */
-    public function setInvoiceNumber(int $orderId, string $invoiceNo): ApiResponse
+    public function setInvoiceNumber(int $orderId, string $invoiceNo, string $invoiceDate = ''): ApiResponse
     {
         $client = $this->request->soap_client($this->apiUrl);
         try {
-            $response = $client->__soapCall('SetFaturaNo', [[
+            $args = [
                 'UyeKodu'   => $this->request->key,
-                'SiparisId' => $orderId,
+                'SiparisID' => $orderId,
                 'FaturaNo'  => $invoiceNo,
-            ]]);
+            ];
+            if ($invoiceDate !== '') {
+                $args['FaturaTarihi'] = $invoiceDate;
+            }
+
+            $response = $client->__soapCall('SetFaturaNo', [$args]);
 
             return ApiResponse::success($response, 'Invoice number set successfully.');
         } catch (SoapFault $e) {
@@ -261,10 +263,10 @@ class OrderService
         try {
             $response = $client->__soapCall('SaveKargoTakipNo', [[
                 'UyeKodu'              => $this->request->key,
-                'SiparisId'            => $orderId,
-                'KargoKodu'            => $kargoKodu,
-                'KargoTakipNo'         => $kargoTakipNo,
-                'KargoTakipLink'       => $kargoTakipLink,
+                'siparisId'            => $orderId,
+                'kargoKodu'            => $kargoKodu,
+                'kargoTakipNo'         => $kargoTakipNo,
+                'kargoTakipLink'       => $kargoTakipLink,
                 'BarkodBilgisi'        => $barkodBilgisi,
                 'KargoTakipLinkGoster' => $kargoTakipLinkGoster,
             ]]);
@@ -281,7 +283,7 @@ class OrderService
         try {
             $client->__soapCall($soapMethod, [[
                 'UyeKodu'   => $this->request->key,
-                'SiparisId' => $orderId,
+                'siparisId' => $orderId,
             ]]);
 
             return ApiResponse::success(null, 'Order updated successfully.');

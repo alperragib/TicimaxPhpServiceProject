@@ -158,7 +158,10 @@ The `AlperRagib\Ticimax\Service\Order\OrderStatus`,
 `PaymentStatus`, and `PaymentType` classes expose the integer values that
 Ticimax expects:
 
-**`OrderStatus`** (used by `setOrderStatus` and the `SiparisDurumu` filter):
+**`OrderStatus`** integer constants. Pass them straight to `setOrderStatus`; the
+service converts them to the PascalCase string the WSDL's `WebSiparisDurumlari`
+enum expects (e.g. `ODEME_BEKLIYOR` → `"OdemeBekliyor"`). You can also pass the
+PascalCase string directly if you prefer.
 
 | Constant              | Value | Meaning                      |
 | --------------------- | ----- | ---------------------------- |
@@ -180,6 +183,7 @@ Ticimax expects:
 | `IPTAL_TALEBI`        | 15    | İptal talebi                 |
 | `KISMI_IADE_TALEBI`   | 16    | Kısmi iade talebi            |
 | `KISMI_IADE_YAPILDI`  | 17    | Kısmi iade yapıldı           |
+| `TESLIM_EDILEMEDI`    | 18    | Teslim edilemedi             |
 
 **`PaymentStatus`** (used in `Odeme.OdemeDurumu` when creating an order):
 `ONAY_BEKLIYOR=0`, `ONAYLANDI=1`, `HATALI=2`, `IADE_EDILMIS=3`, `IPTAL_EDILMIS=4`.
