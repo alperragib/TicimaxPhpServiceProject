@@ -15,8 +15,7 @@
     "ext-soap": "*",
     "ext-mbstring": "*"
   },
-  "require-dev": {
-  },
+  "require-dev": {},
   "autoload": {
     "psr-4": {
       "AlperRagib\\Ticimax\\": "src/"
