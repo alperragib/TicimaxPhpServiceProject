@@ -1,13 +1,13 @@
 {
-  "name": "alperragib/ticimax-php-service",
+  "name": "gokmen-korkmaz/ticimax-php-service",
   "description": "A PHP library for integrating with the Ticimax SOAP API.",
   "type": "library",
   "license": "MIT",
   "minimum-stability": "stable",
   "authors": [
     {
-      "name": "Alper Ragıb",
-      "email": "alper.ragib@gmail.com"
+      "name": "Gokmen Korkmaz",
+      "email": "gokmen.korkmaz@gmail.com"
     }
   ],
   "require": {
@@ -18,12 +18,12 @@
   "require-dev": {},
   "autoload": {
     "psr-4": {
-      "AlperRagib\\Ticimax\\": "src/"
+      "GokmenKorkmaz\\Ticimax\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "AlperRagib\\Ticimax\\Tests\\": "tests/"
+      "GokmenKorkmaz\\Ticimax\\Tests\\": "tests/"
     }
   }
 }
